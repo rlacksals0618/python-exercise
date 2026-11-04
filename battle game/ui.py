@@ -94,6 +94,12 @@ class Menu:
     def move(self, d):
         self.index = (self.index + d) % len(self.items)
 
+    def item_rect(self, i):
+        """i번째 항목을 누를 수 있는 영역(터치·마우스용)."""
+        r = pygame.Rect(0, 0, 400, self.spacing - 4)
+        r.center = (self.center[0], round(self._y(i)))
+        return r
+
     @property
     def selected(self):
         return self.items[self.index]

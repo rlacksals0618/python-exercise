@@ -93,11 +93,11 @@ class HUD:
         self.combos[0].update(self.fighters[1])
         self.combos[1].update(self.fighters[0])
 
-    def draw(self, surf, timer, config):
+    def draw(self, surf, timer, config, touch=False):
         for i, f in enumerate(self.fighters):
             side = -1 if i == 0 else 1
             if config.options.get("show_commands") and f.pid in self.command_pids:
-                self._commands(surf, f, side, config)
+                self._commands(surf, f, side, config, touch)
             self._health(surf, f, self.bars[i], side)
             self._super(surf, f, side)
             self._combo(surf, self.combos[i], side)
@@ -181,10 +181,15 @@ class HUD:
         ui.draw_text(surf, str(timer), 44, (255, 90, 70) if warn else WHITE, box.center, "center", "heavy", 2,
                      scale=scale)
 
-    def _commands(self, surf, f, side, config):
+    def _commands(self, surf, f, side, config, touch=False):
         """전투 중 커맨드 표: 콤보와 필살기 입력법. 지금 쓰는 기술은 금색으로 빛난다.
         캐릭터 머리 위 빈 공간에 들어가도록 두 칸으로 나눠 낮게 그린다."""
-        punch, kick = config.key_name(f.pid, "punch"), config.key_name(f.pid, "kick")
+        if touch:
+            punch, kick = "팔", "발"
+            legend = "조이스틱 방향 + 팔·발 버튼"
+        else:
+            punch, kick = config.key_name(f.pid, "punch"), config.key_name(f.pid, "kick")
+            legend = f"팔 공격 = {punch}    발 공격 = {kick}"
         left = [("콤보", None, None)]
         left += [(name, command_label(cmd.replace("→", ""), f.facing, punch, kick), None)
                  for name, cmd, _ in COMBOS[f.style]]
@@ -197,8 +202,7 @@ class HUD:
         x0 = 12 if side < 0 else SCREEN_W - 12 - w
         y0 = 100
         ui.panel(surf, (x0, y0, w, h), alpha=190, border=P_COLORS[f.pid], radius=8)
-        ui.draw_text(surf, f"팔 공격 = {punch}    발 공격 = {kick}", 16, GOLD, (x0 + 12, y0 + 15), "midleft", "heavy",
-                     outline=0)
+        ui.draw_text(surf, legend, 16, GOLD, (x0 + 12, y0 + 15), "midleft", "heavy", outline=0)
         ui.draw_text(surf, "필살기", 15, (240, 130, 110), (x0 + col_w + 14, y0 + 15), "midleft", "heavy", outline=0)
         using = f.move.key if f.state == "ATTACK" and f.move else None
         for col, rows in ((0, left), (1, right)):

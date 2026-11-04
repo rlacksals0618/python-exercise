@@ -10,7 +10,7 @@ import ui
 from ai import LEVELS, AIController
 from camera import Camera, View
 from characters import CHARACTERS
-from controls import ACTION_NAMES, ACTIONS, EMPTY_INPUT, KeyboardController, key_label
+from controls import ACTION_NAMES, ACTIONS, EMPTY_INPUT, InputFrame, KeyboardController, key_label
 from effects import Effects, ease_out_back
 from fighter import ATTACK, BLOCKSTUN, HITSTUN, JUGGLE, KO, NEUTRAL, Fighter
 from hud import HUD
@@ -18,6 +18,7 @@ from moves import COMBOS
 from settings import (BODY_HALF_W, EFFECT_COLORS, GOLD, GROUND_Y, HITSTOP, INK, MAX_SEPARATION, P_COLORS,
                       ROUND_TIME, ROUNDS_TO_WIN, SCREEN_H, SCREEN_W, SHAKE, STAGE_LEFT, STAGE_RIGHT, WHITE)
 from stages import STAGES
+import touch
 
 FLAT_VIEW = View()   # 확대 없이 그대로 그리는 보기(캐릭터 선택 카드용)
 
@@ -52,6 +53,7 @@ def nav(app, e, players=(1, 2), arrows=True):
 
 class Scene:
     overlay = False
+    back_button = True    # 터치 모드에서 왼쪽 위에 '뒤로' 버튼을 보일지
 
     def __init__(self, app):
         self.app = app
@@ -59,6 +61,23 @@ class Scene:
 
     def handle_event(self, e):
         pass
+
+    def key(self, k):
+        """키를 누른 것처럼 처리한다. 터치·마우스 입력을 기존 키보드 처리로 넘길 때 쓴다."""
+        self.handle_event(pygame.event.Event(pygame.KEYDOWN, key=k, mod=0, unicode="", scancode=0))
+
+    def back(self):
+        self.key(pygame.K_ESCAPE)
+
+    def tap(self, pos):
+        """화면을 눌렀을 때: 메뉴가 있으면 누른 항목을 골라 Enter."""
+        menu = getattr(self, "menu", None)
+        if menu:
+            for i in range(len(menu.items)):
+                if menu.item_rect(i).collidepoint(pos):
+                    menu.index = i
+                    self.key(pygame.K_RETURN)
+                    return
 
     def update(self):
         self.t += 1
@@ -68,7 +87,8 @@ class Scene:
 
 
 class SceneManager:
-    def __init__(self):
+    def __init__(self, app=None):
+        self.app = app
         self.stack = []
 
     def push(self, scene):
@@ -86,7 +106,28 @@ class SceneManager:
         return self.stack[-1]
 
     def handle_event(self, e):
-        self.top.handle_event(e)
+        top = self.top
+        if e.type in touch.FINGER_EVENTS:
+            self.app.touch = True
+            pos = touch.to_logical(e)
+            if hasattr(top, "finger"):
+                top.finger(e, pos)          # 전투: 가상 조이스틱·버튼
+            elif e.type == pygame.FINGERDOWN:
+                self.tap(pos)
+            return
+        if e.type == pygame.MOUSEBUTTONDOWN:
+            # 손가락이 만든 가짜 마우스 이벤트는 위에서 이미 처리했으므로 무시
+            if e.button == 1 and not getattr(e, "touch", False):
+                self.tap(e.pos)
+            return
+        top.handle_event(e)
+
+    def tap(self, pos):
+        top = self.top
+        if self.app and self.app.touch and top.back_button and touch.BACK_RECT.collidepoint(pos):
+            top.back()
+            return
+        top.tap(pos)
 
     def update(self):
         self.top.update()
@@ -97,6 +138,8 @@ class SceneManager:
             start -= 1
         for scene in self.stack[start:]:
             scene.draw(surf, alpha if scene is self.top else 1.0)
+        if self.app and self.app.touch and self.top.back_button:
+            touch.draw_button(surf, touch.BACK_RECT, "◀ 뒤로")
 
 
 def hint(surf, text):
@@ -105,6 +148,11 @@ def hint(surf, text):
 
 # ── 타이틀 ──
 class TitleScene(Scene):
+    back_button = False
+
+    def tap(self, pos):
+        self.app.manager.replace(ModeSelectScene(self.app))
+
     def handle_event(self, e):
         if nav(self.app, e) in ("ok",) or (e.type == pygame.KEYDOWN and e.key not in CANCEL and self.t > 30):
             self.app.manager.replace(ModeSelectScene(self.app))
@@ -128,7 +176,7 @@ class TitleScene(Scene):
             ui.draw_text(surf, "拳 · 足 · 斬   붓으로 겨루는 격투", 26, (120, 40, 36), (SCREEN_W / 2, 588),
                          outline=0, alpha=a)
         if self.t > 50 and (self.t // 30) % 2 == 0:
-            ui.draw_text(surf, "아무 키나 눌러 시작", 28, INK, (SCREEN_W / 2, 650), outline=0)
+            ui.draw_text(surf, "아무 키나 누르거나 화면을 터치해 시작", 28, INK, (SCREEN_W / 2, 650), outline=0)
 
 
 # ── 모드 선택 ──
@@ -250,6 +298,36 @@ class CharSelectScene(Scene):
         else:
             self._control(self._active_cursor_for_cpu(), nav(self.app, e, players=(1,)), pve=True)
 
+    def _touch_cursor(self):
+        if self.mode == "pve":
+            return self._active_cursor_for_cpu()
+        return next((c for c in self.cursors if not c.done), self.cursors[1])
+
+    def tap(self, pos):
+        for i in range(len(CHARACTERS)):
+            card = pygame.Rect(0, 0, 200, 290)
+            card.midbottom = (Cursor.target_x(i), 470)
+            if card.collidepoint(pos):
+                cur = self._touch_cursor()
+                if cur.done:
+                    return
+                if cur.index == i:
+                    self._control(cur, "ok", pve=self.mode == "pve")
+                else:
+                    cur.index = i
+                return
+
+    def back(self):
+        """확정한 것이 있으면 하나 되돌리고, 없으면 모드 선택으로."""
+        done = [c for c in self.cursors if c.done]
+        if done:
+            if self.mode == "pve":
+                self._control(self._active_cursor_for_cpu(), "back", pve=True)
+            else:
+                done[-1].done = False
+        else:
+            self.key(pygame.K_ESCAPE)
+
     def _control(self, cur, n, pve=False):
         if n is None:
             return
@@ -321,7 +399,10 @@ class CharSelectScene(Scene):
             if self.mode == "pve" and c.pid == 2 and not self.cursors[0].done:
                 continue
             self._info(surf, CHARACTERS[c.index], -1 if k == 0 else 1, P_COLORS[c.pid], labels[c.pid])
-        if self.mode == "pvp":
+        if self.app.touch:
+            who = "" if self.mode == "pvp" else ("컴퓨터 캐릭터를 고르세요 · " if self.cursors[0].done else "내 캐릭터를 고르세요 · ")
+            hint(surf, f"{who}카드를 눌러 고르고, 한 번 더 누르면 확정")
+        elif self.mode == "pvp":
             hint(surf, "P1: A/D 이동 · F 확정 · G 취소      P2: ←/→ 이동 · K 확정 · L 취소      Esc 뒤로")
         else:
             who = "컴퓨터 캐릭터를 고르세요" if self.cursors[0].done else "내 캐릭터를 고르세요"
@@ -358,6 +439,24 @@ class StageSelectScene(Scene):
     @staticmethod
     def _x(i):
         return SCREEN_W / 2 + (i - len(STAGES) / 2) * 196
+
+    def tap(self, pos):
+        if self.vs_t >= 0:
+            return
+        big = pygame.Rect(0, 0, 704, 396)
+        big.midtop = (SCREEN_W / 2, 100)
+        if big.collidepoint(pos):
+            self.key(pygame.K_RETURN)
+            return
+        for i in range(len(STAGES) + 1):
+            r = pygame.Rect(0, 0, 176, 99)
+            r.center = (self._x(i), 610)
+            if r.collidepoint(pos):
+                if self.index == i:
+                    self.key(pygame.K_RETURN)
+                else:
+                    self.index = i
+                return
 
     def handle_event(self, e):
         if self.vs_t >= 0 or e.type != pygame.KEYDOWN:
@@ -416,7 +515,10 @@ class StageSelectScene(Scene):
         sel = pygame.Rect(0, 0, 190, 113)
         sel.center = (self.cursor_x, 610)
         pygame.draw.rect(surf, GOLD, sel, 5, border_radius=8)
-        hint(surf, "←/→ 고르기   ·   Enter 또는 팔 공격 키로 확정   ·   발 공격 키로 캐릭터 선택으로")
+        if self.app.touch:
+            hint(surf, "그림을 눌러 고르고, 한 번 더 누르거나 큰 그림을 누르면 확정")
+        else:
+            hint(surf, "←/→ 고르기   ·   Enter 또는 팔 공격 키로 확정   ·   발 공격 키로 캐릭터 선택으로")
         if self.vs_t >= 0:
             self._vs(surf)
 
@@ -446,6 +548,13 @@ class BattleScene(Scene):
                             KeyboardController(2, app.config) if mode == "pvp" else AIController(f2, f1, level)]
         self.effects = Effects(app.images)
         self.hud = HUD(self.fighters, app.images, command_pids=(1, 2) if mode == "pvp" else (1,))
+        # 터치 조작: 혼자면 조이스틱 왼쪽·버튼 오른쪽, 둘이면 양쪽 끝에 하나씩
+        icon = {c.key: ("slash" if c.style == "sword" else "fist") for c in chars}
+        if mode == "pvp":
+            self.pads = {1: touch.VirtualPad("left", app.images, icon[chars[0].key]),
+                         2: touch.VirtualPad("right", app.images, icon[chars[1].key])}
+        else:
+            self.pads = {1: touch.VirtualPad("single", app.images, icon[chars[0].key])}
         self.pending = set()
         self.round = 1
         self.debug = False
@@ -469,10 +578,34 @@ class BattleScene(Scene):
         self.banner = ("FINAL ROUND" if final else f"ROUND {self.round}", 0)
 
     # 입력
+    back_button = False
+
+    def _pause(self):
+        for pad in self.pads.values():
+            pad.reset()
+        self.app.manager.push(PauseScene(self.app, self))
+
+    def finger(self, e, pos):
+        fid = (e.touch_id, e.finger_id)
+        if e.type == pygame.FINGERDOWN:
+            if touch.PAUSE_RECT.collidepoint(pos):
+                self._pause()
+                return
+            for pad in self.pads.values():
+                if pad.finger_down(fid, pos):
+                    return
+        elif e.type == pygame.FINGERMOTION:
+            for pad in self.pads.values():
+                if pad.owns(fid):
+                    pad.finger_move(fid, pos)
+        else:
+            for pad in self.pads.values():
+                pad.finger_up(fid)
+
     def handle_event(self, e):
         if e.type == pygame.KEYDOWN:
             if e.key == pygame.K_ESCAPE:
-                self.app.manager.push(PauseScene(self.app, self))
+                self._pause()
                 return
             if e.key == pygame.K_F1:
                 self.debug = not self.debug
@@ -482,14 +615,20 @@ class BattleScene(Scene):
 
     def _inputs(self):
         held = pygame.key.get_pressed()
+        pad_frames = {pid: pad.frame() for pid, pad in self.pads.items()}   # 매 틱 읽어서 눌림을 비운다
         frames = []
-        for ctrl in self.controllers:
+        for pid, ctrl in zip((1, 2), self.controllers):
             if self.phase != "fight":
                 frames.append(EMPTY_INPUT)
             elif isinstance(ctrl, AIController):
                 frames.append(ctrl.get_frame())
             else:
-                frames.append(ctrl.read(held, self.pending))
+                k = ctrl.read(held, self.pending)
+                p = pad_frames.get(pid)
+                if p is not None:   # 키보드와 터치를 함께 쓸 수 있게 합친다
+                    k = InputFrame(k.up or p.up, k.down or p.down, k.left or p.left, k.right or p.right,
+                                   k.pressed | p.pressed)
+                frames.append(k)
         self.pending.clear()
         return frames
 
@@ -691,7 +830,11 @@ class BattleScene(Scene):
             if self.debug:
                 self._debug(surf, f, j)
         self.effects.draw_front(surf, cam)
-        self.hud.draw(surf, self.timer, self.app.config)
+        self.hud.draw(surf, self.timer, self.app.config, self.app.touch)
+        if self.app.touch:
+            for pad in self.pads.values():
+                pad.draw(surf)
+            touch.draw_button(surf, touch.PAUSE_RECT, "||", 26)
         self._banner(surf)
         self.effects.draw_flash(surf)
 
@@ -740,6 +883,7 @@ class BattleScene(Scene):
 # ── 일시정지 ──
 class PauseScene(Scene):
     overlay = True
+    back_button = False   # '계속하기'가 있으므로 뒤로 버튼은 체력바를 가리지 않게 숨긴다
     ITEMS = ["계속하기", "기술표", "설정", "캐릭터 선택으로", "타이틀로"]
 
     def __init__(self, app, battle):
@@ -810,6 +954,14 @@ def command_text(app, cmd):
 
 class MoveListScene(Scene):
     overlay = True
+
+    def tap(self, pos):
+        if pos[0] < SCREEN_W / 3:
+            self.key(pygame.K_LEFT)
+        elif pos[0] > SCREEN_W * 2 / 3:
+            self.key(pygame.K_RIGHT)
+        else:
+            self.key(pygame.K_ESCAPE)
 
     def __init__(self, app, index):
         super().__init__(app)
@@ -1019,6 +1171,8 @@ class KeyConfigScene(Scene):
 
 # ── 결과 ──
 class ResultScene(Scene):
+    back_button = False
+
     def __init__(self, app, winner, chars, mode, level, stage=None):
         super().__init__(app)
         self.winner, self.chars, self.mode, self.level, self.stage = winner, chars, mode, level, stage

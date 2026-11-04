@@ -33,7 +33,10 @@ class App:
         self.images = EffectImages()
         pygame.display.set_icon(self.images.get("fist", 64))
         self.paper = ui.paper_texture((SCREEN_W, SCREEN_H))
-        self.manager = SceneManager()
+        self.touch = False      # 손가락 입력이 한 번이라도 들어오면 켜진다
+        self.portrait = False   # 휴대폰을 세로로 들고 있는가(웹)
+        self._orient_tick = -1
+        self.manager = SceneManager(self)
         self.manager.push(TitleScene(self))
         self.running = True
 
@@ -54,9 +57,27 @@ class App:
                 self.manager.update()
                 acc -= dt
             self.manager.draw(self.screen, min(1.0, acc / dt))
+            self._portrait_notice()
             pygame.display.flip()
             await asyncio.sleep(0)   # 브라우저에 차례를 넘긴다(데스크톱에서는 영향 없음)
         pygame.quit()
+
+    def _portrait_notice(self):
+        """휴대폰을 세로로 들면 가로로 돌려 달라고 안내한다(게임 화면이 가로 16:9라서)."""
+        if not WEB:
+            return
+        if pygame.time.get_ticks() // 500 != self._orient_tick:   # 0.5초마다 한 번만 확인
+            self._orient_tick = pygame.time.get_ticks() // 500
+            try:
+                import platform
+                self.portrait = platform.window.innerHeight > platform.window.innerWidth
+            except Exception:
+                self.portrait = False
+        if self.portrait:
+            self.screen.fill((22, 20, 26))
+            ui.draw_text(self.screen, "↻", 120, (250, 248, 240), (SCREEN_W / 2, SCREEN_H / 2 - 80), kind="heavy")
+            ui.draw_text(self.screen, "휴대폰을 가로로 돌려 주세요", 56, (250, 248, 240), (SCREEN_W / 2, SCREEN_H / 2 + 60),
+                         kind="heavy")
 
 
 async def main():
