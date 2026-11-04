@@ -5,7 +5,7 @@ Python과 [pygame-ce](https://pyga.me/)로 만들었고, 웹 버전은 [pygbag](
 
 ## 🎮 바로 플레이하기 (웹)
 
-**https://rlacksals0618-collab.github.io/python-exercise/battle-game/**
+**https://battle-game-triple-command.vercel.app**
 
 Chrome이나 Edge로 위 주소를 열면 설치 없이 바로 플레이할 수 있습니다.
 
@@ -44,7 +44,13 @@ python build_web.py
 python -m pygbag --ume_block 0 web        # 또는 web 폴더를 아무 웹 서버로 열기
 ```
 
-`build_web.py`가 `web/` 폴더에 웹 파일을 만듭니다. 이 폴더 내용을 GitHub Pages(`gh-pages` 브랜치의 `battle-game/`)에 올리면 위 링크가 새 버전으로 바뀝니다.
+`build_web.py`가 `web/` 폴더에 웹 파일을 만듭니다. 웹 링크는 [Vercel](https://vercel.com)에 `battle-game-triple-command` 프로젝트로 올라가 있고, 새로 빌드한 뒤 아래처럼 올리면 위 링크가 새 버전으로 바뀝니다. (`npm i -g vercel`로 설치하고 `vercel login`으로 한 번 로그인해 두어야 합니다.)
+
+```bash
+cd web
+vercel link --yes --project battle-game-triple-command   # build_web.py가 web/를 새로 만들므로 매번 연결
+vercel deploy --prod --yes
+```
 
 ## 조작
 
@@ -184,5 +190,5 @@ python -m pygbag --ume_block 0 web        # 또는 web 폴더를 아무 웹 서�
 | 파일 | 생기는 때 | 내용 |
 |---|---|---|
 | `config.json` | 게임에서 키 설정이나 커맨드 표시를 바꾸면 | 각자의 키 배치와 옵션 |
-| `web/` | `python build_web.py`를 실행하면 | 웹 버전 파일(`index.html`, `battle_game.apk` 등). `gh-pages` 브랜치에 따로 올려 배포 |
+| `web/` | `python build_web.py`를 실행하면 | 웹 버전 파일(`index.html`, `battle_game.apk` 등). Vercel에 따로 올려 배포 |
 | `__pycache__/` | 파이썬을 실행하면 | 파이썬이 만드는 실행 캐시 |
