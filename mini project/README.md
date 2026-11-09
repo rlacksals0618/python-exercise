@@ -4,7 +4,7 @@
 
 ## 🎮 바로 플레이하기
 
-**https://claude.ai/artifact/PLTQaUA6T2p1dpP4ZBr2FA**
+**https://sea-escape-game.vercel.app**
 
 Chrome이나 Edge로 위 주소를 열면 설치 없이 바로 플레이할 수 있습니다. 휴대폰으로 열면 화면 아래에 터치 버튼이 나옵니다.
 
@@ -109,7 +109,14 @@ Chrome이나 Edge로 위 주소를 열면 설치 없이 바로 플레이할 수 
 
 ### 5단계. 웹 배포
 
-tkinter 게임은 브라우저에서 실행되지 않기 때문에, `game.py`의 규칙과 수치를 그대로 JavaScript로 옮긴 웹 버전(`web/index.html`)을 만들어 배포했습니다.
+tkinter 게임은 브라우저에서 실행되지 않기 때문에, `game.py`의 규칙과 수치를 그대로 JavaScript로 옮긴 웹 버전(`web/index.html`)을 만들어 [Vercel](https://vercel.com)에 `sea-escape-game` 프로젝트로 배포했습니다.
+
+`web/index.html`을 고친 뒤 아래처럼 올리면 웹 주소의 게임이 새 버전으로 바뀝니다. (`npm i -g vercel`로 설치하고 `vercel login`으로 한 번 로그인해 두어야 합니다.)
+
+```bash
+cd "mini project/web"
+vercel deploy --prod --yes --project sea-escape-game
+```
 
 ---
 

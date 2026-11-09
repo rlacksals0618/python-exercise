@@ -271,7 +271,7 @@ python batgame.py
 
 깊은 바닷속에서 눈을 뜬 주인공이 발판을 밟고 올라가 수면 위 출구로 탈출하는 게임입니다. 캐릭터를 방향키로 움직이고 점프해서 높은 곳으로 올라갑니다.
 
-**🎮 웹에서 바로 플레이: https://claude.ai/artifact/PLTQaUA6T2p1dpP4ZBr2FA**
+**🎮 웹에서 바로 플레이: https://sea-escape-game.vercel.app**
 
 ### 게임 내용
 

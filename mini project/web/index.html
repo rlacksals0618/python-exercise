@@ -1,3 +1,9 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="발판을 밟고 바닷속에서 수면 위 출구까지 올라가는 플랫폼 게임">
 <title>바닷속 탈출</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,7 +22,9 @@
     color-scheme: dark;
   }
   html, body { background: var(--sea); color: var(--foam); }
-  body { font-family: var(--body); font-size: 15px; line-height: 1.6; }
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--body); font-size: 15px; line-height: 1.6; }
+  [hidden] { display: none !important; }
   .wrap {
     max-width: 920px; margin: 0 auto;
     padding-inline: 16px; padding-block: 20px 32px;
@@ -48,6 +56,8 @@
   }
   .note { margin: 0; color: var(--mist); font-size: 13px; }
 </style>
+</head>
+<body>
 
 <main class="wrap">
   <header>
@@ -655,3 +665,5 @@ function frame(now) {
 requestAnimationFrame(frame);
 canvas.focus({ preventScroll: true });
 </script>
+</body>
+</html>
